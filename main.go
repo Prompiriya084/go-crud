@@ -59,7 +59,7 @@ func main() {
 		}
 		book, err := getBook(db, id)
 		if err != nil {
-			return c.SendStatus(fiber.StatusBadRequest)
+			return c.SendStatus(fiber.StatusNotFound)
 		}
 
 		// if book == nil {
@@ -88,17 +88,38 @@ func main() {
 		if err != nil {
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
-		var book Book
-		if err := c.Bind().JSON(&book); err != nil {
+		// var book Book
+		updatedBook, err := getBook(db, id)
+		if err != nil {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+
+		if err := c.Bind().JSON(&updatedBook); err != nil {
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
-		book.ID = uint(id)
-		if err := updateBook(db, &book); err != nil {
-			return c.SendStatus(fiber.StatusInternalServerError)
+		if err := updateBook(db, updatedBook); err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 
 		return c.JSON(fiber.Map{
 			"message": "update successful.",
+		})
+	})
+	app.Delete("/book/:id", func(c fiber.Ctx) error {
+		id, err := strconv.Atoi(c.Params("id"))
+		if err != nil {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		if _, err := getBook(db, id); err != nil {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+
+		if err := deleteBook(db, id); err != nil {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+		return c.JSON(fiber.Map{
+			"message": "Delete successful",
 		})
 	})
 
@@ -134,9 +155,18 @@ func createBook(db *gorm.DB, book *Book) error {
 }
 func updateBook(db *gorm.DB, book *Book) error {
 	result := db.Save(&book)
+	//result := db.Model(&book).Updates(book)
 	if result != nil {
 		return result.Error
 	}
 
+	return nil
+}
+func deleteBook(db *gorm.DB, id int) error {
+	book := new(Book)
+	result := db.Delete(&book, id)
+	if result.Error != nil {
+		return result.Error
+	}
 	return nil
 }
